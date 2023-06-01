@@ -2,10 +2,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pypfopt.expected_returns import mean_historical_return
 from pypfopt.risk_models import CovarianceShrinkage
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
+from pypfopt.expected_returns import mean_historical_return
+from pypfopt import expected_returns
+from pypfopt import plotting
+from pypfopt import risk_models
+from pypfopt.efficient_frontier import EfficientFrontier
+from pypfopt.discrete_allocation import DiscreteAllocation
+from pypfopt.discrete_allocation import get_latest_prices
+from pypfopt import HRPOpt
+from pypfopt.efficient_frontier import EfficientCVaR
+from scipy import stats
+import yfinance as yf
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import train_test_split
+
+
 df = pd.read_csv(r'MainDataset.csv', parse_dates=True)
 
 date = df['Date']
@@ -176,12 +190,16 @@ amazon = amazon[::-1]
 
 microsoft = df['Microsoft']
 microsoft = microsoft[::-1]
-fig, axmicrosoft = plt.subplots()
-axmicrosoft.plot(date,microsoft)
-axmicrosoft.set_title('Microsoft')
-axmicrosoft.set_xlabel('Date')
-axmicrosoft.set_ylabel('Microsoft')
+# fig, axmicrosoft = plt.subplots()
+# axmicrosoft.plot(date,microsoft)
+# axmicrosoft.set_title('Microsoft')
+# axmicrosoft.set_xlabel('Date')
+# axmicrosoft.set_ylabel('Microsoft')
 
+# plt.plot(date,amazon,marker='o', markersize=1.7, color="green", alpha=0.5, label='Amazon')
+# plt.plot(date,microsoft,marker='o', markersize=1.7, color="red", alpha=0.5, label='Microsoft')
+# plt.title('Technology Equities')
+# plt.legend(markerscale=8)
 
 # nickel = nickel/100
 # plt.plot(date,copper,marker='o', markersize=1.7, color="green", alpha=0.5, label='Copper Price')
@@ -274,6 +292,9 @@ axmicrosoft.set_ylabel('Microsoft')
 # plt.boxplot([ftseglobal],labels=['FTSE Global'])
 # plt.title('FTSE Global Boxplot')
 
+# plt.boxplot([microsoft,amazon],labels=['Microsoft','Amazon',])
+# plt.title('Microsoft and Amazon Boxplot')
+
 ###Oulier Detection###
 
 no_outlier_snp= snp.copy()
@@ -295,6 +316,8 @@ no_outlier_mscius= msciusstock.copy()
 no_outlier_ftseemerging = ftseemerging.copy()
 no_outlier_ftsedeveloped = ftsedeveloped.copy()
 no_outlier_ftseglobal = ftseglobal.copy()
+no_outlier_amazon = amazon.copy()
+no_outlier_microsoft = microsoft.copy()
 
 for x in range(len(no_outlier_exxon)):
     if (no_outlier_exxon[x] < 42.67):
@@ -459,6 +482,12 @@ normalised_ftsedeveloped = scaler.fit_transform(no_outlier_ftsedeveloped)
 no_outlier_ftseglobal = no_outlier_ftseglobal.values.reshape(-1, 1)
 normalised_ftseglobal = scaler.fit_transform(no_outlier_ftseglobal)
 
+no_outlier_amazon = no_outlier_amazon.values.reshape(-1,1)
+normalised_amazon = scaler.fit_transform(no_outlier_amazon)
+
+no_outlier_microsoft = no_outlier_microsoft.values.reshape(-1,1)
+normalised_microsoft = scaler.fit_transform(no_outlier_microsoft)
+
 date = date.values.reshape(-1,1)
 date = date.flatten()
 normalised_snp =normalised_snp.flatten()
@@ -480,9 +509,55 @@ normalised_mscius = normalised_mscius.flatten()
 normalised_ftseemerging = normalised_ftseemerging.flatten()
 normalised_ftsedeveloped = normalised_ftsedeveloped.flatten()
 normalised_ftseglobal = normalised_ftseglobal.flatten()
+normalised_amazon = normalised_amazon.flatten()
+normalised_microsoft = normalised_microsoft.flatten()
 
-alldata = pd.DataFrame({'Date': date,
-                        'S&P 500 Price': normalised_snp,
+no_outlier_snp =no_outlier_snp.flatten()
+no_outlier_exxon = no_outlier_exxon.flatten()
+no_outlier_chevron = no_outlier_chevron.flatten()
+no_outlier_riotinto = no_outlier_riotinto.flatten()
+no_outlier_bhp = no_outlier_bhp.flatten()
+no_outlier_glencore = no_outlier_glencore.flatten()
+no_outlier_brentoil = no_outlier_brentoil.flatten()
+no_outlier_coal = no_outlier_coal.flatten()
+no_outlier_ttfgas = no_outlier_ttfgas.flatten()
+no_outlier_nickel = no_outlier_nickel.flatten()
+no_outlier_copper = no_outlier_copper.flatten()
+no_outlier_msciworld = no_outlier_msciworld.flatten()
+no_outlier_msciemerging = no_outlier_msciemerging.flatten()
+no_outlier_russel2kv = no_outlier_russel2kv.flatten()
+no_outlier_russel2kvgrowth = no_outlier_russel2kvgrowth.flatten()
+no_outlier_mscius = no_outlier_mscius.flatten()
+no_outlier_ftseemerging = no_outlier_ftseemerging.flatten()
+no_outlier_ftsedeveloped = no_outlier_ftsedeveloped.flatten()
+no_outlier_ftseglobal = no_outlier_ftseglobal.flatten()
+no_outlier_amazon = no_outlier_amazon.flatten()
+no_outlier_microsoft = no_outlier_microsoft.flatten()
+
+alldata_notnormalised = pd.DataFrame({'S&P 500 Price': no_outlier_snp,
+                                     'Exxon': no_outlier_exxon,
+                                     'Chevron': no_outlier_chevron,
+                                     'Rio Tinto': no_outlier_riotinto,
+                                     'BHP': no_outlier_bhp,
+                                     'Glencore': no_outlier_glencore,
+                                     'Brent Oil': no_outlier_brentoil,
+                                     'Coal': no_outlier_coal,
+                                     'TTF Gas': no_outlier_ttfgas,
+                                     'Nickel': no_outlier_nickel,
+                                     'Copper': no_outlier_copper,
+                                     'MSCI World': no_outlier_msciworld,
+                                     'MSCI Emerging': no_outlier_msciemerging,
+                                     'Russel 2000 V': no_outlier_russel2kv,
+                                     'Russel 2000 V Growth': no_outlier_russel2kvgrowth,
+                                     'MSCI US': no_outlier_mscius,
+                                     'FTSE Emerging': no_outlier_ftseemerging,
+                                     'FTSE Developed': no_outlier_ftsedeveloped,
+                                     'FTSE Global': no_outlier_ftseglobal,
+                                     'Amazon' : no_outlier_amazon,
+                                     'Microsoft': no_outlier_microsoft})
+
+
+alldata = pd.DataFrame({'S&P 500 Price': normalised_snp,
                         'Exxon': normalised_exxon,
                         'Chevron': normalised_chevron,
                         'Rio Tinto': normalised_riotinto,
@@ -500,7 +575,15 @@ alldata = pd.DataFrame({'Date': date,
                         'MSCI US': normalised_mscius,
                         'FTSE Emerging': normalised_ftseemerging,
                         'FTSE Developed': normalised_ftsedeveloped,
-                        'FTSE Global': normalised_ftseglobal})
+                        'FTSE Global': normalised_ftseglobal,
+                        'Amazon' : normalised_amazon,
+                        'Microsoft': normalised_microsoft})
+
+
+for column in alldata.columns:
+        zero_indices = alldata[alldata[column] == 0].index
+        alldata.loc[zero_indices, column] += 0.000001
+
 
 # pd.describe_option('display')
 # pd.set_option('display.max_columns', None)
@@ -508,12 +591,12 @@ alldata = pd.DataFrame({'Date': date,
 # pd.set_option('display.max_colwidth', None)
 # print(alldata)
 
+
 #########Correaltion Matrix and Variance############
 correlation_matrix = alldata.corr()
 # variance_alldata = alldata.var()
 # print(variance_alldata)
 # print(correlation_matrix)
-#
 # sns.heatmap(data=correlation_matrix,annot=True, xticklabels=True, yticklabels=True)
 
 # plt.plot(date,normalised_snp)
@@ -544,6 +627,280 @@ correlation_matrix = alldata.corr()
 # plt.plot(date,normalised_coal,marker='o', markersize=1.7, color="red", alpha=0.5, label='Normalised Coal')
 # plt.title('Normalised Commodities 2')
 # plt.legend()
+
+# alldata.to_excel(r'C:\Users\USER\Desktop\export_dataframe.xlsx', index=False
+################MEAN VARIANCE OPTIMIZATION###################
+
+
+# mu = expected_returns.mean_historical_return(alldata_notnormalised)
+# S=risk_models.sample_cov(alldata_notnormalised)
+# cov_matrix  = CovarianceShrinkage(alldata_notnormalised).ledoit_wolf()
+#
+# ef = EfficientFrontier(mu,S,weight_bounds=(None,None))
+# ef.add_constraint(lambda w: w[0]+w[1]+w[2]+w[3]+w[4]+w[5]+w[6]+w[7]+w[8]+w[9]+w[10]+w[11]+w[12]+w[13]+w[14]+w[15]+w[16]+w[17]+w[18]+w[19]+w[20]==1)
+# weights = ef.max_sharpe()
+# cl_weisghts = ef.clean_weights()
+# print(cl_weisghts)
+# ef.portfolio_performance(verbose=True)
+#
+# lp = get_latest_prices(alldata_notnormalised)
+#
+# DA = DiscreteAllocation(weights, lp, total_portfolio_value=1000000)
+# allocation, leftover = DA.greedy_portfolio()
+# print("Discrete allocation:", allocation)
+# print("Funds remaining: ${:.2f}".format(leftover))
+#######################EF Plot###############
+########FIRST PLOT##############
+# mu2 = expected_returns.mean_historical_return(alldata_notnormalised)
+# S2=risk_models.sample_cov(alldata_notnormalised)
+# cov_matrix  = CovarianceShrinkage(alldata_notnormalised).ledoit_wolf()
+#
+# ef = EfficientFrontier(mu2,S2,weight_bounds=(None,None))
+# ef.add_constraint(lambda w: w[0]+w[1]+w[2]+w[3]+w[4]+w[5]+w[6]+w[7]+w[8]+w[9]+w[10]+w[11]+w[12]+w[13]+w[14]+w[15]+w[16]+w[17]+w[18]+w[19]+w[20]==1)
+# plotting.plot_efficient_frontier(ef)
+#########SECOND PLOT WITH 1000 PORTFOLIOS WITH RISK RAGE 0.1 AND 0.8
+# mu2 = expected_returns.mean_historical_return(alldata_notnormalised)
+# S2=risk_models.sample_cov(alldata_notnormalised)
+# cov_matrix  = CovarianceShrinkage(alldata_notnormalised).ledoit_wolf()
+#
+# ef = EfficientFrontier(mu2,S2,weight_bounds=(None,None))
+# ef.add_constraint(lambda w: w[0]+w[1]+w[2]+w[3]+w[4]+w[5]+w[6]+w[7]+w[8]+w[9]+w[10]+w[11]+w[12]+w[13]+w[14]+w[15]+w[16]+w[17]+w[18]+w[19]+w[20]==1)
+# risk_range = np.linspace(0.1,0.8,1000)
+# plotting.plot_efficient_frontier(ef,ef_param="risk",ef_param_range=risk_range,show_assets=True,showfig=True)
+# ef.portfolio_performance(verbose=True)
+# #########PLOT ALL POTFOLIOS#############
+# mu2 = expected_returns.mean_historical_return(alldata_notnormalised)
+# S2=risk_models.sample_cov(alldata_notnormalised)
+# cov_matrix  = CovarianceShrinkage(alldata_notnormalised).ledoit_wolf()
+#
+# ef = EfficientFrontier(mu2,S2,weight_bounds=(None,None))
+# ef.add_constraint(lambda w: w[0]+w[1]+w[2]+w[3]+w[4]+w[5]+w[6]+w[7]+w[8]+w[9]+w[10]+w[11]+w[12]+w[13]+w[14]+w[15]+w[16]+w[17]+w[18]+w[19]+w[20]==1)
+#
+# fig, axEF = plt.subplots()
+# plotting.plot_efficient_frontier(ef,ax=axEF,show_assets=False)
+# res, std_tan , ret_tan = ef.portfolio_performance(verbose=True)
+# axEF.scatter(std_tan,ret_tan,marker='*',s=100,c='r',label='Max Sharpe')
+#
+# n=10000
+# w=np.random.dirichlet(np.ones(len(mu2)),n)
+# ret = w.dot(mu2)
+# std = np.sqrt(np.diag(w @ S2 @ w.T))
+# sharpe = ret/std
+# axEF.scatter(std, ret, marker='.',c= sharpe, cmap='viridis_r')
+# axEF.set_title('Efficient Frontier With 10000 Random Portfolios')
+# axEF.legend()
+# plt.tight_layout()
+
+#############With formulas ###############
+# del df["Date"]
+# alldata_mean = alldata.mean()
+# covmatrix = alldata.cov()
+# weights = np.array([0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05])
+# sum = np.sum(alldata_mean*weights)*252
+# std = np.sqrt(np.dot(weights.T,np.dot(covmatrix,weights))) * np.sqrt(252)
+# print(round(sum*100,2),round(std*100,2))
+#############Hierarchical Risk Parity############
+# returns = alldata_notnormalised.pct_change().dropna()
+# hrp = HRPOpt(returns)
+# hrp_weights = hrp.optimize()
+# hrp.portfolio_performance(verbose=True)
+# cl_hrp_weights = hrp.clean_weights()
+# print(dict(cl_hrp_weights))
+# lp= get_latest_prices(alldata_notnormalised)
+# da_hrp = DiscreteAllocation(hrp_weights, lp, total_portfolio_value=1000000)
+#
+# allocation, leftover = da_hrp.greedy_portfolio()
+# print("Discrete allocation (HRP):", allocation)
+# print("Funds remaining (HRP): ${:.2f}".format(leftover))
+#####normalised DAta######
+# returns = alldata_notnormalised.pct_change().dropna()
+# hrp = HRPOpt(returns)
+# hrp_weights = hrp.optimize()
+# hrp.portfolio_performance(verbose=True)
+# cl_hrp_weights = hrp.clean_weights()
+# print('Weights = ', dict(cl_hrp_weights))
+# lp= get_latest_prices(alldata_notnormalised)
+# da_hrp = DiscreteAllocation(hrp_weights, lp, total_portfolio_value=100000)
+#
+# allocation, leftover = da_hrp.greedy_portfolio()
+# print("Discrete allocation (HRP):", allocation)
+# print("Funds remaining (HRP): ${:.2f}".format(leftover))
+#################Mean Conditional Value at Risk#########################
+# mu = mean_historical_return(alldata)
+# S = alldata.cov()
+# ef_cvar = EfficientCVaR(mu, S)
+# cvar_weights = ef_cvar.min_cvar()
+#
+# cleaned_weights = ef_cvar.clean_weights()
+# print(dict(cleaned_weights))
+# lp= get_latest_prices(alldata)
+# da_cvar = DiscreteAllocation(cvar_weights, lp, total_portfolio_value=100000)
+# allocation, leftover = da_cvar.greedy_portfolio()
+# print("Discrete allocation (CVAR):", allocation)
+# print("Funds remaining (CVAR): ${:.2f}".format(leftover))
+
+pct = alldata_notnormalised.pct_change()
+mean_pct = pct.mean()
+covMatrix_pct = pct.cov()
+weights = np.random.random(len(mean_pct))
+weights /= np.sum(weights)
+print(weights)
+
+sims = 100
+day = 252
+mean =np.full(shape=(day,len(weights)),fill_value=mean_pct)
+mean = mean.T
+port_sims =  np.full(shape=(day,sims),fill_value=0)
+first_portfolio = 100000
+sum = 0
+for s in range(0,sims):
+    Z = np.random.normal(size=(day, len(weights)))
+    L = np.linalg.cholesky(covMatrix_pct)
+    daily_returns = mean + np.inner(L,Z)
+    port_sims[:,s] =np.cumprod(np.inner(weights,daily_returns.T)+1)*first_portfolio
+
+for s in range(0,sims):
+    sum += port_sims[251][s]
+print('Average Portfolio Value at 252th Day', sum/sims)
+print('Net Return After 252 Days on This Portfolio ', round((sum/sims)-first_portfolio,2))
+# plt.figure(figsize=(16,8))
+# plt.plot(port_sims)
+# plt.ylabel('Portfolio Value (USD)')
+# plt.xlabel('Days')
+# plt.title('Monte Carlo Simulation of Portfolio')
+r= 0.01
+SharpeR = (port_sims.mean()-r)/port_sims.std()
+print(SharpeR)
+
+
+
+
+#################Hierarchical Risk Parity######################
+# returns = alldata_notnormalised.pct_change().dropna()
+# hrp = HRPOpt(returns)
+# hrp_weights = hrp.optimize()
+# hrp.portfolio_performance(verbose=True)
+# print(dict(hrp_weights))
+#
+# lp= get_latest_prices(alldata)
+# da_hrp = DiscreteAllocation(hrp_weights, lp, total_portfolio_value=100000)
+# allocation, leftover = da_hrp.greedy_portfolio()
+# print("Discrete allocation (HRP):", allocation)
+# print("Funds remaining (HRP): ${:.2f}".format(leftover))
+
+# stock_returns = alldata_notnormalised.pct_change()
+#
+# weights = {'S&P 500 Price':0.05,'Exxon':0.05,'Chevron': 0.05,'Rio Tinto' :0.05,'BHP': 0.05,'Glencore':0.05,'Brent Oil':0.05,'Coal':0.05,'TTF Gas':0.05,'Nickel':0.05,'Copper':0.05,'MSCI World':0.05,'MSCI Emerging': 0.05,'Russel 2000 V':0.05,'Russel 2000 V Growth':0.05,'MSCI US':0.05,'FTSE Emerging':0.05,'FTSE Developed':0.05,'FTSE Global':0.05,'Amazon' :0.05,'Microsoft' :0.05}
+# #
+# port_return = ([weights.get(x) for x in stock_returns.columns]*stock_returns).sum(axis=1)
+# port_return = pd.DataFrame(port_return)
+# port_return.rename(columns={port_return.columns[0]: 'Main Portfolio'}, inplace=True)
+# port_return_var = port_return['Main Portfolio']
+# print(port_return.describe())
+
+# comp_data = yf.download("SPY ARKK XLE XLF GLD QQQ",start='2011-05-19',end='2023-03-13')
+# comp_data_returns = comp_data['Adj Close'].pct_change()[1:]
+# spy = comp_data_returns['SPY']
+# arkk = comp_data_returns['ARKK']
+# xle = comp_data_returns['XLE']
+# xlf = comp_data_returns['XLF']
+# gld = comp_data_returns['GLD']
+# qqq = comp_data_returns['QQQ']
+# calc_dataframe= pd.DataFrame({'SPY':spy,
+#                          'ARKK':arkk,
+#                          'XLE':xle,
+#                          'XLF':xlf,
+#                          'GLD':gld,
+#                          'QQQ':qqq,
+#                          'Main Portfolio':port_return_var})
+# print(comp_data_returns.describe())
+
+# print(calc_dataframe)
+# alldata_notnormalised = pd.DataFrame({'Date':date,
+#                                      'S&P 500 Price': no_outlier_snp,
+#                                      'Exxon': no_outlier_exxon,
+#                                      'Chevron': no_outlier_chevron,
+#                                      'Rio Tinto': no_outlier_riotinto,
+#                                      'BHP': no_outlier_bhp,
+#                                      'Glencore': no_outlier_glencore,
+#                                      'Brent Oil': no_outlier_brentoil,
+#                                      'Coal': no_outlier_coal,
+#                                      'TTF Gas': no_outlier_ttfgas,
+#                                      'Nickel': no_outlier_nickel,
+#                                      'Copper': no_outlier_copper,
+#                                      'MSCI World': no_outlier_msciworld,
+#                                      'MSCI Emerging': no_outlier_msciemerging,
+#                                      'Russel 2000 V': no_outlier_russel2kv,
+#                                      'Russel 2000 V Growth': no_outlier_russel2kvgrowth,
+#                                      'MSCI US': no_outlier_mscius,
+#                                      'FTSE Emerging': no_outlier_ftseemerging,
+#                                      'FTSE Developed': no_outlier_ftsedeveloped,
+#                                      'FTSE Global': no_outlier_ftseglobal,
+#                                      'Amazon' : no_outlier_amazon,
+#                                      'Microsoft': no_outlier_microsoft,})
+#
+# alldata_notnormalised = alldata_notnormalised.set_index('Date')
+#
+# returns = alldata_notnormalised.pct_change()
+# mean_returns = returns.mean()
+# covMatrix_returns = returns.cov()
+# weights = np.random.random(len(mean_returns))
+# weights /= np.sum(weights)
+#
+# portfolio_return = returns.dot(weights)
+# var_matrix = returns.cov()*252
+#
+# portfolio_var = np.transpose(weights)@var_matrix@weights
+#
+# portfolio_vol = np.sqrt(portfolio_var)
+# print('Portfolio Variance: ',portfolio_var)
+# print('Portfolio Volatility: ',portfolio_vol)
+#
+# portfolio_returns = []
+# portfolio_volatilies = []
+# portfolio_weights = []
+# asset_nums =len(alldata_notnormalised.columns)
+# num_of_portfolios = 1000
+# indv_rets = alldata_notnormalised.resample('Y').last().pct_change().mean()
+#
+# for portfolio in range(num_of_portfolios):
+#     var = var_matrix.mul(weights,axis=0).mul(weights,axis=1).sum().sum()
+#     std = np.sqrt(var)
+#     vol = std*np.sqrt(252)
+#     portfolio_volatilies.append(vol)
+#     weights = np.random.random(asset_nums)
+#     weights = weights/np.sum(weights)
+#     portfolio_weights.append(weights)
+#     returns = np.dot(weights,indv_rets)
+#     portfolio_returns.append(returns)
+#
+#
+# output = pd.DataFrame({'Returns':portfolio_returns,
+#                        'Volatility':portfolio_volatilies})
+#
+# output.plot.scatter(x='Volatility', y='Returns', marker='o',color='red',s=30, alpha=0.6)
+# plt.xlabel('Volatility')
+# plt.ylabel('Returns')
+# plt. title('Return - Volatility Of Modern Portfolio Theory')
+#
+# output_volatility = output['Volatility']
+# output_returns = output['Returns']
+# r =0.05
+#
+# min_vol=output.iloc[output['Volatility'].idxmin()]
+# print((min_vol))
+#
+# best_ShrapeR = output.iloc[((output_returns-r)/output_volatility).idxmax()]
+# print(best_ShrapeR)
+#
+# plt.subplots()
+# plt.scatter(output_volatility,output_returns,alpha=0.6,s=30,color='red')
+# plt.scatter(min_vol[1],min_vol[0],color='y',marker='*',s=300,label='Min Volatility')
+# plt.scatter(best_ShrapeR[1],best_ShrapeR[0],color='b',marker='*',s=300,label='Best Sharpe Ratio')
+# plt.xlabel('Volatility')
+# plt.ylabel('Returns')
+# plt.legend()
+# plt.title('Return - Volatility Of Modern Portfolio Theory With Max Sharpe Ratio and Minimum Volatility')
 
 plt.show()
 
